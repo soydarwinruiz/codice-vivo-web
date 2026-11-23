@@ -8,14 +8,14 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Códice vivo" />
   <meta name="theme-color" content="#7A4A1E" />
-  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="icon" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="icon" href="/icon-192.png" />
   <title>Códice vivo</title>
 </head>
 <body>
   <div id="app">
     <div style="max-width:520px;margin:0 auto;padding:60px 24px;font-family:-apple-system,sans-serif;color:#231a14">
-      <img src="icon-192.png" width="72" height="72" style="border-radius:18px" alt="" />
+      <img src="/icon-192.png" width="72" height="72" style="border-radius:18px" alt="" />
       <h1 style="font-family:Georgia,serif">Códice vivo</h1>
       <p id="boot-msg">Cargando…</p>
     </div>
@@ -24,19 +24,40 @@
   <script>
     // Diagnóstico: si algo falla al arrancar, mostrarlo en pantalla en lugar de una página en blanco.
     (function () {
+      // Asegurar la barra final en la dirección (…/codice-vivo-web/)
+      if (/\/codice-vivo-web$/.test(location.pathname)) { location.replace(location.pathname + '/' + location.search + location.hash); return; }
       function show(msg) {
         var el = document.getElementById('boot-err');
         el.style.display = 'block';
         el.textContent += (el.textContent ? '\n' : '') + msg;
       }
       window.__bootError = show;
-      window.addEventListener('error', function (e) { show('Error: ' + (e.message || e) + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : '')); });
+      // Fallos al cargar archivos (scripts, estilos, imágenes): solo se ven en fase de captura
+      window.addEventListener('error', function (e) {
+        var t = e.target;
+        if (t && t !== window && (t.src || t.href)) show('No se pudo cargar: ' + (t.src || t.href));
+      }, true);
+      window.addEventListener('error', function (e) { if (!e.message) return; show('Error: ' + (e.message || e) + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : '')); });
       window.addEventListener('unhandledrejection', function (e) { show('Error: ' + ((e.reason && e.reason.message) || e.reason)); });
       setTimeout(function () {
         if (!window.__codiceOk) {
           var m = document.getElementById('boot-msg');
           if (m) m.textContent = 'La app no terminó de cargar. Datos para soporte:';
           show('Navegador: ' + navigator.userAgent);
+          show('Dirección: ' + location.href);
+          var sc = document.querySelector('script[type=module]');
+          if (sc) fetch(sc.src, { cache: 'no-store' }).then(function (r) { show('Script principal: HTTP ' + r.status + ' ' + sc.src); }, function (er) { show('Script principal: ' + er); });
+          if (navigator.serviceWorker && navigator.serviceWorker.controller) show('Service worker activo (podría servir una versión antigua).');
+          var b = document.createElement('button');
+          b.textContent = 'Limpiar y recargar';
+          b.style.cssText = 'margin:0 16px;padding:12px 18px;border:0;border-radius:20px;background:#7A4A1E;color:#fff;font:600 16px -apple-system,sans-serif';
+          b.onclick = function () {
+            var jobs = [];
+            if (navigator.serviceWorker) jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) { return Promise.all(rs.map(function (r) { return r.unregister(); })); }));
+            if (window.caches) jobs.push(caches.keys().then(function (ks) { return Promise.all(ks.map(function (k) { return caches.delete(k); })); }));
+            Promise.all(jobs).then(function () { location.reload(); }, function () { location.reload(); });
+          };
+          document.body.appendChild(b);
         }
       }, 10000);
     })();

@@ -3,7 +3,7 @@ import preact from '@preact/preset-vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
-  base: './',
+  base: '/codice-vivo-web/',
   build: { outDir: 'docs', emptyOutDir: true, target: 'es2020' },
   optimizeDeps: { exclude: ['@sqlite.org/sqlite-wasm'] },
   worker: { format: 'es' },
@@ -15,7 +15,7 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,wasm,png,svg,ico,webmanifest}'],
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
-        navigateFallback: 'index.html',
+        navigateFallback: '/codice-vivo-web/index.html',
       },
       manifest: {
         name: 'Códice vivo',
@@ -24,8 +24,9 @@ export default defineConfig({
         lang: 'es',
         display: 'standalone',
         orientation: 'portrait',
-        start_url: './',
-        scope: './',
+        start_url: '/codice-vivo-web/',
+        scope: '/codice-vivo-web/',
+        id: '/codice-vivo-web/',
         background_color: '#FFFBF5',
         theme_color: '#7A4A1E',
         icons: [
