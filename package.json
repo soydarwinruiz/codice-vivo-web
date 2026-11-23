@@ -1,0 +1,33 @@
+{
+  "name": "codice-vivo-web",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/soydarwinruiz/codice-vivo-web.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/soydarwinruiz/codice-vivo-web/issues"
+  },
+  "homepage": "https://github.com/soydarwinruiz/codice-vivo-web#readme",
+  "dependencies": {
+    "@sqlite.org/sqlite-wasm": "^3.54.1-build1",
+    "preact": "^11.2.0"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
+    "vite": "^8.3.8",
+    "vite-plugin-pwa": "^2.0.0"
+  },
+  "type": "module",
+  "private": true
+}
