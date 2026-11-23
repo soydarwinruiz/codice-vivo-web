@@ -3,3 +3,4 @@ node_modules/
 *.db.gz
 test-results/
 shots/
+graphify-out/
