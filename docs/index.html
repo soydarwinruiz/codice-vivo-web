@@ -11,10 +11,37 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
   <link rel="icon" href="icon-192.png" />
   <title>Códice vivo</title>
-  <script type="module" crossorigin src="./assets/index-D_BwnvWs.js"></script>
+  <script type="module" crossorigin src="./assets/index-ZqVJunsE.js"></script>
   <link rel="stylesheet" crossorigin href="./assets/index-lSJRXNqu.css">
 <link rel="manifest" href="./manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="./registerSW.js"></script></head>
 <body>
-  <div id="app"></div>
+  <div id="app">
+    <div style="max-width:520px;margin:0 auto;padding:60px 24px;font-family:-apple-system,sans-serif;color:#231a14">
+      <img src="icon-192.png" width="72" height="72" style="border-radius:18px" alt="" />
+      <h1 style="font-family:Georgia,serif">Códice vivo</h1>
+      <p id="boot-msg">Cargando…</p>
+    </div>
+  </div>
+  <div id="boot-err" style="display:none;margin:16px;padding:14px;border-radius:12px;background:#fde7e4;color:#5c1a14;font:14px -apple-system,sans-serif;white-space:pre-wrap"></div>
+  <script>
+    // Diagnóstico: si algo falla al arrancar, mostrarlo en pantalla en lugar de una página en blanco.
+    (function () {
+      function show(msg) {
+        var el = document.getElementById('boot-err');
+        el.style.display = 'block';
+        el.textContent += (el.textContent ? '\n' : '') + msg;
+      }
+      window.__bootError = show;
+      window.addEventListener('error', function (e) { show('Error: ' + (e.message || e) + (e.filename ? ' (' + e.filename.split('/').pop() + ':' + e.lineno + ')' : '')); });
+      window.addEventListener('unhandledrejection', function (e) { show('Error: ' + ((e.reason && e.reason.message) || e.reason)); });
+      setTimeout(function () {
+        if (!window.__codiceOk) {
+          var m = document.getElementById('boot-msg');
+          if (m) m.textContent = 'La app no terminó de cargar. Datos para soporte:';
+          show('Navegador: ' + navigator.userAgent);
+        }
+      }, 10000);
+    })();
+  </script>
 </body>
 </html>

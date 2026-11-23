@@ -3,6 +3,12 @@ const worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'modu
 let seq = 0;
 const pending = new Map();
 
+worker.onerror = (e) => {
+  const msg = `No se pudo iniciar la base de datos (${e.message || 'worker'}).`;
+  window.__bootError?.(msg);
+  pending.forEach((p) => p.reject(new Error(msg))); pending.clear();
+};
+
 worker.onmessage = (e) => {
   const { id, result, error, progress } = e.data;
   const p = pending.get(id);

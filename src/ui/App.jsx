@@ -26,7 +26,12 @@ export function App() {
 
   async function boot() {
     try {
-      const st = await call('init');
+      const missing = [];
+      if (!navigator.storage?.getDirectory) missing.push('almacenamiento privado (OPFS)');
+      if (typeof DecompressionStream === 'undefined') missing.push('descompresión');
+      if (missing.length) throw new Error(`Este navegador no tiene: ${missing.join(', ')}. Actualiza el iPhone a iOS 16.4 o superior.`);
+      const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('La base de datos no respondió a tiempo.')), 20000));
+      const st = await Promise.race([call('init'), timeout]);
       await initUser();
       if (!st.hasLibrary) { setState({ phase: 'setup' }); return; }
       await loadMeta();
@@ -40,7 +45,7 @@ export function App() {
   useEffect(() => { document.documentElement.className = s.theme === 'sepia' ? 'theme-sepia' : dark ? 'theme-dark' : ''; }, [s.theme, dark]);
 
   if (state.phase === 'loading') return <div class="setup"><h1 class="serif">Códice vivo</h1><p class="muted">Abriendo…</p></div>;
-  if (state.phase === 'error') return <div class="setup"><h1 class="serif">Códice vivo</h1><p>No se pudo abrir el almacenamiento local: {state.error}</p><p class="muted small">Requiere iOS 16.4 o superior (Safari). Si usas el modo privado de Safari, ábrela en modo normal.</p></div>;
+  if (state.phase === 'error') return <div class="setup"><h1 class="serif">Códice vivo</h1><p>No se pudo abrir el almacenamiento local: {state.error}</p><p class="muted small">Requiere iOS 16.4 o superior (Safari). Si usas el modo privado de Safari, ábrela en modo normal.</p><p class="muted small" style="word-break:break-all">{navigator.userAgent}</p><button class="btn" onClick={() => location.reload()}>Reintentar</button></div>;
   if (state.phase === 'setup' || route.path === '/setup') return <Setup onDone={() => { nav('/today', null, true); boot(); }} />;
 
   const p = route.path, a = route.params;
