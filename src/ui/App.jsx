@@ -16,6 +16,7 @@ import { Dictionary, DictEntry } from './screens/Dictionary.jsx';
 import { Mine, TopicDetail, TagDetail, Memory } from './screens/Mine.jsx';
 import { ProgressScreen, PlanScreen, Quiz } from './screens/Progress.jsx';
 import { SettingsScreen } from './screens/Settings.jsx';
+import { Journal, JournalEdit } from './screens/Journal.jsx';
 
 const TABS = [['/today', '☀️', 'Hoy'], ['/reader', '📖', 'Biblia'], ['/study', '🎓', 'Estudio'], ['/mine', '🔖', 'Mis temas'], ['/progress', '📊', 'Progreso']];
 
@@ -77,6 +78,8 @@ export function App() {
     case '/plan': screen = <PlanScreen id={+a.id} />; break;
     case '/quiz': screen = <Quiz practice={a.p === '1'} />; break;
     case '/settings': screen = <SettingsScreen />; break;
+    case '/journal': screen = <Journal tab={+(a.t || 0)} />; break;
+    case '/journal-edit': screen = <JournalEdit id={+(a.id || 0)} kind={a.kind} b={+(a.b || 0)} c={+(a.c || 0)} v={+(a.v || 0)} />; break;
     default: screen = <Today />;
   }
   return (

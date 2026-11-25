@@ -20,7 +20,14 @@ selector libro → capítulo → versículo, búsqueda sin acentos, comparar ver
 notas, temas, etiquetas, marcadores, notas e introducciones de MacArthur, diccionario bíblico, índice temático, lecciones,
 editor de estudio (contexto, exégesis, hermenéutica, homilética), planes de lectura, progreso, logros, memorización,
 lectura en voz alta y temas claro/oscuro/sepia.
-El **respaldo JSON es compatible con la app de Android**.
+El **respaldo JSON es compatible con la app de Android** en los dos sentidos.
+
+### Compatibilidad con Android 1.5
+- **Diario** (peticiones de oración con «respondida» y entradas de diario): se puede orar desde un versículo del lector (botón «Orar») o desde *Mis temas › Diario*.
+- **Memorizar con SM-2**: cuatro respuestas (otra vez, difícil, bien, fácil) y modo **escribir de memoria**, con el mismo algoritmo que Android para que un versículo avance igual en los dos teléfonos.
+- **Búsqueda**: frase exacta, en notas MacArthur y en tus notas, estudios y diario, con historial.
+- La base de datos personal se actualiza sola (añade las columnas nuevas sin perder nada) y la importación ignora los campos que no conozca, así que un respaldo de una versión más nueva no hace fallar la restauración.
+- Importante: los respaldos de Android 1.5 **no se pueden importar en la versión web anterior**; actualiza la web (se actualiza sola al abrirla con conexión) antes de restaurarlos.
 
 ## Desarrollo
 ```bash

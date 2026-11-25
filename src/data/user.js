@@ -1,5 +1,6 @@
 // Datos personales (SQLite local). Mismos campos que la app Android para que el respaldo JSON sea compatible.
 import { uq, uexec, uinsert, umany } from '../db/client.js';
+import { SM2, sm2Review } from '../domain/sm2.js';
 
 export function today() { const d = new Date(); return Math.floor((d.getTime() - d.getTimezoneOffset() * 60000) / 86400000); }
 const now = () => Date.now();
@@ -23,9 +24,15 @@ const TABLES = [
      originalMeaning TEXT, principle TEXT, crossReferences TEXT, application TEXT, proposition TEXT, purpose TEXT, outline TEXT,
      illustrations TEXT, sermonApplication TEXT, conclusion TEXT, created INT, updated INT` },
   { t: 'lesson_reflections', k: 'reflections', cols: 'lessonId INTEGER PRIMARY KEY, text TEXT, updated INT' },
-  { t: 'memory_verses', k: 'memory', cols: 'id INTEGER PRIMARY KEY AUTOINCREMENT, book INT, chapter INT, verse INT, verseEnd INT, box INT, nextReview INT, reviews INT, created INT', uniq: 'book,chapter,verse' },
+  { t: 'memory_verses', k: 'memory', cols: 'id INTEGER PRIMARY KEY AUTOINCREMENT, book INT, chapter INT, verse INT, verseEnd INT, box INT, nextReview INT, reviews INT, created INT, ease REAL DEFAULT 2.5, interval INT DEFAULT 0, lapses INT DEFAULT 0', uniq: 'book,chapter,verse',
+    // Columnas añadidas en Android 1.5 (repaso SM-2): se agregan a bases creadas antes.
+    added: { ease: 'REAL DEFAULT 2.5', interval: 'INT DEFAULT 0', lapses: 'INT DEFAULT 0' } },
   { t: 'word_highlights', k: 'wordHighlights', cols: 'id INTEGER PRIMARY KEY AUTOINCREMENT, version TEXT, book INT, chapter INT, verse INT, wordStart INT, wordEnd INT, color INT, created INT' },
+  // Diario (Android 1.5): peticiones de oración (kind='prayer') y entradas de diario (kind='journal').
+  { t: 'journal', k: 'journal', cols: "id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT DEFAULT 'prayer', title TEXT DEFAULT '', text TEXT DEFAULT '', book INT DEFAULT 0, chapter INT DEFAULT 0, verse INT DEFAULT 0, answered INT DEFAULT 0, answeredAt INT DEFAULT 0, answerNote TEXT DEFAULT '', created INT, updated INT", bools: ['answered'] },
 ];
+/** Columnas de cada tabla (para importar respaldos con campos que esta versión no conoce). */
+const columnsOf = {};
 
 // ---- Notificación de cambios para refrescar pantallas ----
 const listeners = new Set();
@@ -41,6 +48,15 @@ export async function initUser() {
     { sql: `CREATE TABLE IF NOT EXISTS ${x.t}(${x.cols})` },
     ...(x.uniq ? [{ sql: `CREATE UNIQUE INDEX IF NOT EXISTS u_${x.t} ON ${x.t}(${x.uniq})` }] : []),
   ]));
+  for (const x of TABLES) {
+    let cols = (await uq(`PRAGMA table_info(${x.t})`)).map((c) => c.name);
+    const missing = Object.entries(x.added || {}).filter(([c]) => !cols.includes(c));
+    if (missing.length) {
+      await umany(missing.map(([c, def]) => ({ sql: `ALTER TABLE ${x.t} ADD COLUMN ${c} ${def}` })));
+      cols = cols.concat(missing.map(([c]) => c));
+    }
+    columnsOf[x.t] = new Set(cols);
+  }
 }
 
 export const Points = { CHAPTER: 10, DEVOTIONAL: 5, QUIZ_CORRECT: 10, QUIZ_PERFECT_BONUS: 20, PLAN_DAY: 20, STUDY: 15, MEMORY: 5 };
@@ -149,13 +165,32 @@ export async function saveReflection(id, text) {
   if (!text.trim()) return w('DELETE FROM lesson_reflections WHERE lessonId=?', id);
   return w('INSERT OR REPLACE INTO lesson_reflections(lessonId,text,updated) VALUES(?,?,?)', id, text.trim(), now());
 }
-const INTERVALS = [1, 2, 4, 7, 15, 30, 60];
-export const addMemory = (b, c, v, ve) => ins('INSERT OR IGNORE INTO memory_verses(book,chapter,verse,verseEnd,box,nextReview,reviews,created) VALUES(?,?,?,?,0,?,0,?)', b, c, v, ve, today(), now());
-export async function reviewMemory(m, knew) {
-  const box = knew ? Math.min(m.box + 1, INTERVALS.length - 1) : 0;
-  await w('UPDATE memory_verses SET box=?, nextReview=?, reviews=reviews+1 WHERE id=?', box, today() + INTERVALS[box], m.id);
-  if (knew) await addPoints(Points.MEMORY);
+export const addMemory = (b, c, v, ve) => ins('INSERT OR IGNORE INTO memory_verses(book,chapter,verse,verseEnd,box,nextReview,reviews,created,ease,interval,lapses) VALUES(?,?,?,?,0,?,0,?,2.5,0,0)', b, c, v, ve, today(), now());
+/** Repaso SM-2 (mismo algoritmo que Android 1.5). grade: 0 otra vez, 1 difícil, 2 bien, 3 fácil. */
+export async function reviewMemory(m, grade) {
+  const n = sm2Review(m, grade, today());
+  await w('UPDATE memory_verses SET box=?, nextReview=?, reviews=?, ease=?, interval=?, lapses=? WHERE id=?', n.box, n.nextReview, n.reviews, n.ease, n.interval, n.lapses, m.id);
+  if (grade >= SM2.HARD) await addPoints(Points.MEMORY);
 }
+// ---- Diario ----
+export const journal = (kind) => uq('SELECT * FROM journal WHERE kind=? ORDER BY answered, updated DESC', kind);
+export const journalEntry = async (id) => (await uq('SELECT * FROM journal WHERE id=?', id))[0];
+export const answeredCount = async () => (await uq("SELECT COUNT(*) n FROM journal WHERE kind='prayer' AND answered=1"))[0].n;
+export async function saveJournal(e) {
+  const t = now();
+  const answeredAt = e.answered ? (e.answeredAt || t) : 0;
+  if (e.id) return w('UPDATE journal SET title=?, text=?, answered=?, answeredAt=?, answerNote=?, updated=? WHERE id=?', e.title, e.text, e.answered ? 1 : 0, answeredAt, e.answerNote || '', t, e.id);
+  return ins('INSERT INTO journal(kind,title,text,book,chapter,verse,answered,answeredAt,answerNote,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
+    e.kind, e.title, e.text, e.book || 0, e.chapter || 0, e.verse || 0, e.answered ? 1 : 0, answeredAt, e.answerNote || '', t, t);
+}
+export const deleteJournal = (id) => w('DELETE FROM journal WHERE id=?', id);
+
+// ---- Búsqueda en datos personales ----
+const like = (q) => `%${q}%`;
+export const searchNotes = (q) => uq('SELECT * FROM verse_notes WHERE text LIKE ? ORDER BY updated DESC LIMIT 100', like(q));
+export const searchStudies = (q) => uq('SELECT * FROM studies WHERE title LIKE ?1 OR observation LIKE ?1 OR principle LIKE ?1 OR application LIKE ?1 OR proposition LIKE ?1 OR outline LIKE ?1 OR exegeticalIdea LIKE ?1 OR keyWords LIKE ?1 ORDER BY updated DESC LIMIT 50', like(q));
+export const searchJournal = (q) => uq('SELECT * FROM journal WHERE title LIKE ?1 OR text LIKE ?1 OR answerNote LIKE ?1 ORDER BY updated DESC LIMIT 50', like(q));
+
 export const deleteMemory = (id) => w('DELETE FROM memory_verses WHERE id=?', id);
 export async function setWordHighlights(version, b, c, v, ranges) {
   await umany([{ sql: 'DELETE FROM word_highlights WHERE version=? AND book=? AND chapter=? AND verse=?', params: [version, b, c, v] },
@@ -165,7 +200,7 @@ export async function setWordHighlights(version, b, c, v, ranges) {
 
 // ---- Respaldo (compatible con la app Android) ----
 export async function exportJson() {
-  const out = { app: 'BibliaEstudio', version: 1, created: now() };
+  const out = { app: 'BibliaEstudio', version: 2, created: now() };
   for (const x of TABLES) {
     const rows = await uq(`SELECT * FROM ${x.t}`);
     out[x.k] = rows.map((r) => { const o = { ...r }; delete o.count; (x.bools || []).forEach((b) => { o[b] = !!o[b]; }); return o; });
@@ -177,8 +212,10 @@ export async function importJson(text) {
   const stmts = TABLES.map((x) => ({ sql: `DELETE FROM ${x.t}` }));
   let n = 0;
   for (const x of TABLES) {
+    const known = columnsOf[x.t];
     for (const row of data[x.k] || []) {
-      const keys = Object.keys(row); n++;
+      // Solo columnas que existen aquí: un respaldo de una versión más nueva no hace fallar la importación.
+      const keys = Object.keys(row).filter((k) => !known || known.has(k)); n++;
       stmts.push({ sql: `INSERT OR REPLACE INTO ${x.t}(${keys.join(',')}) VALUES(${keys.map(() => '?').join(',')})`, params: keys.map((k) => (typeof row[k] === 'boolean' ? (row[k] ? 1 : 0) : row[k])) });
     }
   }

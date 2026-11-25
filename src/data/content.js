@@ -55,10 +55,11 @@ export async function compare(b, ch, v) {
 export async function crossRefs(b, ch, v) { return (await q('SELECT refs FROM crossrefs WHERE book=? AND chapter=? AND verse=?', b, ch, v)).map((r) => r.refs); }
 export async function versesWithNotes(b, ch) { return new Set((await q('SELECT verse FROM study_notes WHERE book=? AND chapter=?', b, ch)).map((r) => r.verse)); }
 
-export async function search(query, version, testament, limit = 300) {
+export async function search(query, version, testament, limit = 300, exact = false) {
   const words = query.trim().split(/\s+/).filter(Boolean).map((w) => w.replace(/["*():^\-]/g, '')).filter(Boolean);
   if (!words.length) return [];
-  const match = words.map((w) => `"${w}"*`).join(' ');
+  // Frase exacta: las palabras seguidas y en ese orden; si no, todas las palabras (con prefijo) en cualquier orden.
+  const match = exact ? `"${words.join(' ')}"` : words.map((w) => `"${w}"*`).join(' ');
   let sql = 'SELECT v.version,v.book,v.chapter,v.verse,v.text FROM verses_fts f JOIN verses v ON v.id=f.rowid WHERE verses_fts MATCH ?';
   const args = [match];
   if (version) { sql += ' AND v.version=?'; args.push(version); }

@@ -3,6 +3,7 @@ import * as C from '../../data/content.js';
 import * as U from '../../data/user.js';
 import { useSettings } from '../../data/settings.js';
 import { speak } from '../../domain/speaker.js';
+import { SM2, sm2Preview, compareTyped, gradeFor } from '../../domain/sm2.js';
 import { useAsync, useUser, nav, openRef, share, TopBar, Loading, Empty, Tabs, Dialog, VerseItem, argb, HIGHLIGHTS, HIGHLIGHT_NAMES, TOPIC_COLORS } from '../components.jsx';
 
 const TABS = ['Temas', 'Etiquetas', 'Resaltados', 'Notas', 'Marcadores'];
@@ -15,7 +16,7 @@ export function Mine() {
   const d = useUser(async () => ({ topics: await U.topicsAll(), tags: await U.tagsAll(), hl: await U.highlightsAll(), notes: await U.notesAll(), bm: await U.bookmarksAll(), mem: (await U.memoryAll()).length }));
   return (
     <div>
-      <TopBar back={false} title="Mis temas"><button class="btn text" onClick={() => nav('/memory')}>🧠 Memorizar ({d?.mem ?? 0})</button></TopBar>
+      <TopBar back={false} title="Mis temas"><button class="btn text" onClick={() => nav('/journal')}>🙏 Diario</button><button class="btn text" onClick={() => nav('/memory')}>🧠 Memorizar ({d?.mem ?? 0})</button></TopBar>
       <Tabs tabs={TABS} value={tab} onChange={setTab} />
       {!d ? <Loading /> : <div class="list">
         {tab === 0 && <>
@@ -113,7 +114,7 @@ export function Memory() {
       <div><TopBar title="Memorizar versículos" /><div class="empty"><div class="e">🧠</div><h2>Repaso terminado</h2><p>Recordaste {known} de {session.length}. +{known * 5} puntos</p><button class="btn" onClick={() => setSession(null)}>Volver</button></div></div>
     );
     return <div><TopBar title="Memorizar versículos" /><Review key={session[i].id} m={session[i]} r={mref(session[i])} version={s.version} index={i} total={session.length}
-      onAnswer={async (knew) => { await U.reviewMemory(session[i], knew); if (knew) setKnown(known + 1); setI(i + 1); }} /></div>;
+      onAnswer={async (grade) => { await U.reviewMemory(session[i], grade); if (grade >= SM2.HARD) setKnown(known + 1); setI(i + 1); }} /></div>;
   }
   return (
     <div>
@@ -121,29 +122,53 @@ export function Memory() {
       {!all ? <Loading /> : <>
         <div class="card tint">
           <h3>{all.length} versículos · {all.filter((m) => m.box >= 6).length} memorizados</h3>
-          <p class="small">Repaso espaciado: cada vez que recuerdas un versículo, se repasa con menos frecuencia (1, 2, 4, 7, 15, 30 y 60 días).</p>
+          <p class="small">Repaso espaciado (SM-2): según lo bien que recuerdes cada versículo, el siguiente repaso se aleja más o menos. Puedes recitarlo o escribirlo para comprobarlo palabra por palabra.</p>
           <button class="btn" disabled={!due.length} onClick={() => { setSession(due); setI(0); setKnown(0); }}>{due.length ? `Repasar ahora (${due.length})` : 'Nada pendiente hoy'}</button>
         </div>
         {!all.length && <Empty icon="🧠" title="Aún no hay versículos" text="En el lector, selecciona un versículo y toca «Memorizar»." />}
-        <div class="list">{all.map((m) => <VerseItem r={mref(m)} extra={BOX[m.box] + (m.nextReview <= U.today() ? ' · para hoy' : '')} trailing={<button class="icon-btn" onClick={(e) => { e.stopPropagation(); U.deleteMemory(m.id); }}>🗑️</button>} />)}</div>
+        <div class="list">{all.map((m) => <VerseItem r={mref(m)} extra={BOX[Math.min(6, Math.max(0, m.box))] + (m.nextReview <= U.today() ? ' · para hoy' : ` · en ${days(m.nextReview - U.today())}`)} trailing={<button class="icon-btn" onClick={(e) => { e.stopPropagation(); U.deleteMemory(m.id); }}>🗑️</button>} />)}</div>
       </>}
     </div>
   );
 }
 
+const days = (n) => (n === 1 ? '1 día' : n < 30 ? `${n} días` : n < 365 ? `${Math.floor(n / 30)} mes${n >= 60 ? 'es' : ''}` : '1 año');
+const GRADES = ['Otra vez', 'Difícil', 'Bien', 'Fácil'];
+
 function Review({ m, r, version, index, total, onAnswer }) {
   const text = useAsync(() => C.passageText(version, r), [m.id]);
   const [reveal, setReveal] = useState(false); const [showHint, setShowHint] = useState(false);
+  const [typing, setTyping] = useState(false); const [typed, setTyped] = useState('');
+  const [result, setResult] = useState(null);
+  const preview = sm2Preview(m, U.today());
+  const suggested = result ? gradeFor(result[0]) : SM2.GOOD;
   return (
     <div class="page" style="text-align:center">
       <div class="progress"><div style={{ width: `${(index / total) * 100}%` }} /></div>
       <p class="small muted">{index + 1} de {total}</p>
       <h2 class="serif">{C.label(r)}</h2>
-      <p class="muted">Recita el versículo de memoria</p>
-      <div class="card serif" style="font-size:1.15rem;line-height:1.5">{reveal ? text : showHint ? hint(text || '') : '• • •'}</div>
-      {!reveal ? <div class="row" style="justify-content:center"><button class="btn outline" disabled={showHint} onClick={() => setShowHint(true)}>Pista</button><button class="btn" onClick={() => setReveal(true)}>Mostrar</button></div>
-        : <><button class="icon-btn" onClick={() => speak('mem', [text])}>🔊</button>
-          <div class="row" style="justify-content:center"><button class="btn outline" onClick={() => onAnswer(false)}>No lo recordé</button><button class="btn" onClick={() => onAnswer(true)}>¡Lo sé!</button></div></>}
+      <p class="muted">{typing ? 'Escribe el versículo de memoria' : 'Recita el versículo de memoria'}</p>
+      {typing && !reveal ? <>
+        <textarea class="input" rows="5" style="width:100%" placeholder="Escribe aquí…" value={typed} onInput={(e) => setTyped(e.target.value)} />
+        {showHint && <p class="serif small">{hint(text || '')}</p>}
+        <div class="row" style="justify-content:center"><button class="btn outline" onClick={() => setShowHint(!showHint)}>Pista</button>
+          <button class="btn" disabled={!typed.trim()} onClick={() => { setResult(compareTyped(text || '', typed)); setReveal(true); }}>Comprobar</button></div>
+      </> : <div class="card serif" style="font-size:1.15rem;line-height:1.5">
+        {result ? result[1].map(([w, ok], i) => <span key={i} style={{ color: ok ? 'var(--primary)' : '#B3261E', textDecoration: ok ? 'none' : 'underline' }}>{i ? ' ' : ''}{w}</span>)
+          : reveal ? text : showHint ? hint(text || '') : '• • •'}
+      </div>}
+      {result && <p class="small"><b>Acertaste {Math.round(result[0] * 100)} % de las palabras</b></p>}
+      {!reveal && !typing && <div class="row" style="justify-content:center">
+        <button class="btn outline" disabled={showHint} onClick={() => setShowHint(true)}>Pista</button>
+        <button class="btn outline" onClick={() => setTyping(true)}>Escribir</button>
+        <button class="btn" onClick={() => setReveal(true)}>Mostrar</button></div>}
+      {reveal && <>
+        <button class="icon-btn" onClick={() => speak('mem', [text])}>🔊</button>
+        <p class="small"><b>¿Qué tal lo recordaste?</b></p>
+        <div class="row" style="justify-content:center;gap:6px;flex-wrap:nowrap">
+          {GRADES.map((g, i) => <button class={`btn ${i === suggested ? '' : 'outline'}`} style="flex:1;padding:8px 4px;line-height:1.2" onClick={() => onAnswer(i)}>
+            {g}<br /><span style="font-size:.72rem;font-weight:400">{days(preview[i])}</span></button>)}
+        </div></>}
     </div>
   );
 }

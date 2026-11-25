@@ -110,6 +110,7 @@ export function Reader({ args }) {
     switch (a) {
       case 'compare': nav('/compare', { b: sb, c: sc, v: selVerses[0] }); break;
       case 'study': nav('/study-edit', { id: 0, b: sb, c: sc, v: r.verse, ce: sc, ve: r.verseEnd }); break;
+      case 'journal': nav('/journal-edit', { kind: 'prayer', b: sb, c: sc, v: r.verse }); break;
       case 'memory': { const n = await U.addMemory(sb, sc, r.verse, r.verseEnd); toast(n === -1 ? 'Ya está en tu lista de memorización' : 'Añadido a Memorizar'); setSel([]); break; }
       case 'bookmark': await U.toggleBookmark(sb, sc, selVerses[0]); setSel([]); break;
       case 'copy': case 'share': {
@@ -193,7 +194,7 @@ export function Reader({ args }) {
           </div>
           <div class="acts">
             {[['notes', '📚', 'MacArthur'], ['note', '📝', 'Nota'], ['words', '🖍️', 'Palabras'], ['topic', '🗂️', 'Tema'], ['tag', '🏷️', 'Etiqueta'], ['compare', '⚖️', 'Comparar'],
-              ['study', '🎓', 'Estudiar'], ['memory', '🧠', 'Memorizar'], ['bookmark', '🔖', 'Marcador'], ['copy', '📋', 'Copiar'], ['share', '📤', 'Compartir'], ['clear', '✖️', 'Cerrar']]
+              ['study', '🎓', 'Estudiar'], ['memory', '🧠', 'Memorizar'], ['journal', '🙏', 'Orar'], ['bookmark', '🔖', 'Marcador'], ['copy', '📋', 'Copiar'], ['share', '📤', 'Compartir'], ['clear', '✖️', 'Cerrar']]
               .map(([k, ic, l]) => <button key={k} onClick={() => action(k)}><span class="ic">{ic}</span>{l}</button>)}
           </div>
         </div>
