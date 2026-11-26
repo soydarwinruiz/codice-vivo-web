@@ -47,7 +47,7 @@ export function SettingsScreen() {
       <div class="section-h">Biblioteca</div>
       <div class="page"><button class="btn outline" onClick={() => setReplace(true)}>Reemplazar biblioteca (nueva versión)</button></div>
       <div class="section-h">Acerca de</div>
-      <p class="page small" style="white-space:pre-line">{`Códice vivo — Biblia de estudio 100% local. Todo el contenido y tus datos permanecen en este dispositivo.\n\nContenido de estudio: Biblia de Estudio MacArthur (© Editorial Portavoz / Thomas Nelson), para uso personal.\n\nTextos bíblicos:\n${C.versions.map((v) => `• ${v.id}: ${v.copyright || v.name}`).join('\n')}`}</p>
+      <p class="page small" style="white-space:pre-line">{`Códice vivo — Biblia de estudio\nCreada por Danruz.\n\nBiblia de estudio 100% local. Todo el contenido y tus datos permanecen en este dispositivo.\n\nContenido de estudio: Biblia de Estudio MacArthur (© Editorial Portavoz / Thomas Nelson), para uso personal.\n\nTextos bíblicos:\n${C.versions.map((v) => `• ${v.id}: ${v.copyright || v.name}`).join('\n')}`}</p>
       {pending && <Dialog title="¿Restaurar respaldo?" onClose={() => setPending(null)} actions={<><button class="btn text" onClick={() => setPending(null)}>Cancelar</button>
         <button class="btn text" onClick={async () => { const f = pending; setPending(null); try { await U.importJson(await f.text()); toast('Respaldo restaurado'); } catch (e) { toast('Archivo no válido'); } }}>Restaurar</button></>}>
         <p class="small">Se reemplazarán todos tus datos personales actuales por los del archivo.</p></Dialog>}
