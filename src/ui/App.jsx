@@ -18,7 +18,7 @@ import { ProgressScreen, PlanScreen, Quiz } from './screens/Progress.jsx';
 import { SettingsScreen } from './screens/Settings.jsx';
 import { Journal, JournalEdit } from './screens/Journal.jsx';
 
-const TABS = [['/today', '☀️', 'Hoy'], ['/reader', '📖', 'Biblia'], ['/study', '🎓', 'Estudio'], ['/mine', '🔖', 'Mis temas'], ['/progress', '📊', 'Progreso']];
+const TABS = [['/today', '☀️', 'Hoy'], ['/reader', '📖', 'Biblia'], ['/study', '🎓', 'Estudio'], ['/journal', '📅', 'Diario'], ['/mine', '🔖', 'Temas'], ['/progress', '📊', 'Progreso']];
 
 export function App() {
   const s = useSettings();
@@ -45,7 +45,7 @@ export function App() {
   const dark = s.theme === 'dark' || (s.theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
   useEffect(() => { document.documentElement.className = s.theme === 'sepia' ? 'theme-sepia' : dark ? 'theme-dark' : ''; }, [s.theme, dark]);
 
-  if (state.phase === 'loading') return <div class="setup"><h1 class="serif">Códice vivo</h1><p class="muted">Abriendo…</p></div>;
+  if (state.phase === 'loading') return <div class="setup"><h1 class="serif">Códice vivo</h1><p class="muted small">por Danruz</p><p class="muted">Abriendo…</p></div>;
   if (state.phase === 'error') return <div class="setup"><h1 class="serif">Códice vivo</h1><p>No se pudo abrir el almacenamiento local: {state.error}</p><p class="muted small">Requiere iOS 16.4 o superior (Safari). Si usas el modo privado de Safari, ábrela en modo normal.</p><p class="muted small" style="word-break:break-all">{navigator.userAgent}</p><button class="btn" onClick={() => location.reload()}>Reintentar</button></div>;
   if (state.phase === 'setup' || route.path === '/setup') return <Setup onDone={() => { nav('/today', null, true); boot(); }} />;
 

@@ -10,7 +10,8 @@ const TABLES = [
   { t: 'verse_notes', k: 'notes', cols: 'id INTEGER PRIMARY KEY AUTOINCREMENT, book INT, chapter INT, verse INT, text TEXT, created INT, updated INT' },
   { t: 'bookmarks', k: 'bookmarks', cols: 'id INTEGER PRIMARY KEY AUTOINCREMENT, book INT, chapter INT, verse INT, created INT', uniq: 'book,chapter,verse' },
   { t: 'user_topics', k: 'topics', cols: 'id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, description TEXT, color INT, created INT' },
-  { t: 'topic_verses', k: 'topicVerses', cols: 'id INTEGER PRIMARY KEY AUTOINCREMENT, topicId INT, book INT, chapter INT, verse INT, verseEnd INT, note TEXT, created INT', uniq: 'topicId,book,chapter,verse' },
+  { t: 'topic_verses', k: 'topicVerses', cols: 'id INTEGER PRIMARY KEY AUTOINCREMENT, topicId INT, book INT, chapter INT, verse INT, verseEnd INT, note TEXT, created INT, position INT DEFAULT 0', uniq: 'topicId,book,chapter,verse',
+    added: { position: 'INT DEFAULT 0' } },
   { t: 'tags', k: 'tags', cols: 'id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT', uniq: 'name' },
   { t: 'tag_verses', k: 'tagVerses', cols: 'id INTEGER PRIMARY KEY AUTOINCREMENT, tagId INT, book INT, chapter INT, verse INT, created INT', uniq: 'tagId,book,chapter,verse' },
   { t: 'chapters_read', k: 'chaptersRead', cols: 'book INT, chapter INT, readAt INT, PRIMARY KEY(book,chapter)' },
@@ -29,7 +30,9 @@ const TABLES = [
     added: { ease: 'REAL DEFAULT 2.5', interval: 'INT DEFAULT 0', lapses: 'INT DEFAULT 0' } },
   { t: 'word_highlights', k: 'wordHighlights', cols: 'id INTEGER PRIMARY KEY AUTOINCREMENT, version TEXT, book INT, chapter INT, verse INT, wordStart INT, wordEnd INT, color INT, created INT' },
   // Diario (Android 1.5): peticiones de oración (kind='prayer') y entradas de diario (kind='journal').
-  { t: 'journal', k: 'journal', cols: "id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT DEFAULT 'prayer', title TEXT DEFAULT '', text TEXT DEFAULT '', book INT DEFAULT 0, chapter INT DEFAULT 0, verse INT DEFAULT 0, answered INT DEFAULT 0, answeredAt INT DEFAULT 0, answerNote TEXT DEFAULT '', created INT, updated INT", bools: ['answered'] },
+  { t: 'journal', k: 'journal', cols: "id INTEGER PRIMARY KEY AUTOINCREMENT, kind TEXT DEFAULT 'prayer', title TEXT DEFAULT '', text TEXT DEFAULT '', book INT DEFAULT 0, chapter INT DEFAULT 0, verse INT DEFAULT 0, answered INT DEFAULT 0, answeredAt INT DEFAULT 0, answerNote TEXT DEFAULT '', created INT, updated INT, eventType TEXT DEFAULT '', eventAt INT DEFAULT 0, place TEXT DEFAULT '', reminderMinutes INT DEFAULT -1", bools: ['answered'],
+    // Agenda de actividades (Android 1.6)
+    added: { eventType: "TEXT DEFAULT ''", eventAt: 'INT DEFAULT 0', place: "TEXT DEFAULT ''", reminderMinutes: 'INT DEFAULT -1' } },
 ];
 /** Columnas de cada tabla (para importar respaldos con campos que esta versión no conoce). */
 const columnsOf = {};
@@ -89,7 +92,13 @@ export const memoryAll = () => all('memory_verses', 'ORDER BY box, created');
 export const memoryDue = (d) => uq('SELECT * FROM memory_verses WHERE nextReview<=? ORDER BY box, nextReview', d);
 export const wordHighlights = (v) => uq('SELECT * FROM word_highlights WHERE version=?', v);
 export const topic = async (id) => (await uq('SELECT * FROM user_topics WHERE id=?', id))[0];
-export const topicVerses = (id) => uq('SELECT * FROM topic_verses WHERE topicId=? ORDER BY book,chapter,verse', id);
+export const topicVerses = (id) => uq('SELECT * FROM topic_verses WHERE topicId=? ORDER BY position, created, id', id);
+/** Guarda el orden elegido (ids en el nuevo orden). */
+export async function reorderTopic(ids) { await umany(ids.map((id, i) => ({ sql: 'UPDATE topic_verses SET position=? WHERE id=?', params: [i + 1, id] }))); changed(); }
+export async function sortTopicByBook(topicId) {
+  const vs = await uq('SELECT id FROM topic_verses WHERE topicId=? ORDER BY book, chapter, verse', topicId);
+  return reorderTopic(vs.map((v) => v.id));
+}
 export const tag = async (id) => (await uq('SELECT * FROM tags WHERE id=?', id))[0];
 export const tagVerses = (id) => uq('SELECT * FROM tag_verses WHERE tagId=? ORDER BY book,chapter,verse', id);
 export const topicsOfVerse = async (b, c, v) => new Set((await uq('SELECT topicId FROM topic_verses WHERE book=? AND chapter=? AND verse=?', b, c, v)).map((r) => r.topicId));
@@ -114,7 +123,8 @@ export const deleteBookmark = (b, c, v) => w('DELETE FROM bookmarks WHERE book=?
 export const createTopic = (name, description, color) => ins('INSERT INTO user_topics(name,description,color,created) VALUES(?,?,?,?)', name.trim(), (description || '').trim(), color, now());
 export const updateTopic = (t) => w('UPDATE user_topics SET name=?, description=?, color=? WHERE id=?', t.name, t.description, t.color, t.id);
 export async function deleteTopic(id) { await uexec('DELETE FROM topic_verses WHERE topicId=?', id); return w('DELETE FROM user_topics WHERE id=?', id); }
-export const addTopicVerse = (tid, b, c, v, ve) => ins('INSERT OR IGNORE INTO topic_verses(topicId,book,chapter,verse,verseEnd,note,created) VALUES(?,?,?,?,?,?,?)', tid, b, c, v, ve, '', now());
+// Los versículos nuevos van al final del tema, en el orden en que se agregan.
+export const addTopicVerse = (tid, b, c, v, ve) => ins('INSERT OR IGNORE INTO topic_verses(topicId,book,chapter,verse,verseEnd,note,created,position) VALUES(?,?,?,?,?,?,?,(SELECT COALESCE(MAX(position),0)+1 FROM topic_verses WHERE topicId=?))', tid, b, c, v, ve, '', now(), tid);
 export const removeTopicVerse = (tid, b, c, v) => w('DELETE FROM topic_verses WHERE topicId=? AND book=? AND chapter=? AND verse=?', tid, b, c, v);
 export async function createTag(name) {
   const n = name.trim().replace(/^#/, '');
@@ -174,14 +184,16 @@ export async function reviewMemory(m, grade) {
 }
 // ---- Diario ----
 export const journal = (kind) => uq('SELECT * FROM journal WHERE kind=? ORDER BY answered, updated DESC', kind);
+export const events = () => uq("SELECT * FROM journal WHERE kind='event' ORDER BY eventAt");
 export const journalEntry = async (id) => (await uq('SELECT * FROM journal WHERE id=?', id))[0];
 export const answeredCount = async () => (await uq("SELECT COUNT(*) n FROM journal WHERE kind='prayer' AND answered=1"))[0].n;
 export async function saveJournal(e) {
   const t = now();
   const answeredAt = e.answered ? (e.answeredAt || t) : 0;
-  if (e.id) return w('UPDATE journal SET title=?, text=?, answered=?, answeredAt=?, answerNote=?, updated=? WHERE id=?', e.title, e.text, e.answered ? 1 : 0, answeredAt, e.answerNote || '', t, e.id);
-  return ins('INSERT INTO journal(kind,title,text,book,chapter,verse,answered,answeredAt,answerNote,created,updated) VALUES(?,?,?,?,?,?,?,?,?,?,?)',
-    e.kind, e.title, e.text, e.book || 0, e.chapter || 0, e.verse || 0, e.answered ? 1 : 0, answeredAt, e.answerNote || '', t, t);
+  const ev = [e.eventType || '', e.eventAt || 0, e.place || '', e.reminderMinutes ?? -1];
+  if (e.id) return w('UPDATE journal SET title=?, text=?, answered=?, answeredAt=?, answerNote=?, updated=?, eventType=?, eventAt=?, place=?, reminderMinutes=? WHERE id=?', e.title, e.text, e.answered ? 1 : 0, answeredAt, e.answerNote || '', t, ...ev, e.id);
+  return ins('INSERT INTO journal(kind,title,text,book,chapter,verse,answered,answeredAt,answerNote,created,updated,eventType,eventAt,place,reminderMinutes) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    e.kind, e.title, e.text, e.book || 0, e.chapter || 0, e.verse || 0, e.answered ? 1 : 0, answeredAt, e.answerNote || '', t, t, ...ev);
 }
 export const deleteJournal = (id) => w('DELETE FROM journal WHERE id=?', id);
 
@@ -189,7 +201,7 @@ export const deleteJournal = (id) => w('DELETE FROM journal WHERE id=?', id);
 const like = (q) => `%${q}%`;
 export const searchNotes = (q) => uq('SELECT * FROM verse_notes WHERE text LIKE ? ORDER BY updated DESC LIMIT 100', like(q));
 export const searchStudies = (q) => uq('SELECT * FROM studies WHERE title LIKE ?1 OR observation LIKE ?1 OR principle LIKE ?1 OR application LIKE ?1 OR proposition LIKE ?1 OR outline LIKE ?1 OR exegeticalIdea LIKE ?1 OR keyWords LIKE ?1 ORDER BY updated DESC LIMIT 50', like(q));
-export const searchJournal = (q) => uq('SELECT * FROM journal WHERE title LIKE ?1 OR text LIKE ?1 OR answerNote LIKE ?1 ORDER BY updated DESC LIMIT 50', like(q));
+export const searchJournal = (q) => uq('SELECT * FROM journal WHERE title LIKE ?1 OR text LIKE ?1 OR answerNote LIKE ?1 OR place LIKE ?1 ORDER BY updated DESC LIMIT 50', like(q));
 
 export const deleteMemory = (id) => w('DELETE FROM memory_verses WHERE id=?', id);
 export async function setWordHighlights(version, b, c, v, ranges) {

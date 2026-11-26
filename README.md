@@ -1,5 +1,7 @@
 # Códice vivo — versión web para iPhone (PWA)
 
+**Autor: Danruz**
+
 Biblia de estudio **100% local** que se instala en el iPhone desde Safari, sin App Store ni Mac.
 Este repositorio contiene **solo el código** (sin contenido con derechos de autor).
 La biblioteca (Biblias, notas de MacArthur, diccionario, oraciones…) se importa una vez desde un archivo privado
@@ -21,6 +23,11 @@ notas, temas, etiquetas, marcadores, notas e introducciones de MacArthur, diccio
 editor de estudio (contexto, exégesis, hermenéutica, homilética), planes de lectura, progreso, logros, memorización,
 lectura en voz alta y temas claro/oscuro/sepia.
 El **respaldo JSON es compatible con la app de Android** en los dos sentidos.
+
+### Compatibilidad con Android 1.6
+- **Diario** en la barra inferior con **Agenda** de la iglesia (tipo, nombre, día y hora, lugar, notas). El aviso lo da la app de Android; en el iPhone se guarda para que viaje en el respaldo.
+- **Temas**: los versículos quedan en el orden en que se agregan; ▲▼ para reordenar u «Ordenar por libro».
+- `public/android-version.json`: archivo que la app de Android consulta para avisar de nuevas versiones.
 
 ### Compatibilidad con Android 1.5
 - **Diario** (peticiones de oración con «respondida» y entradas de diario): se puede orar desde un versículo del lector (botón «Orar») o desde *Mis temas › Diario*.

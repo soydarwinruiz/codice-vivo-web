@@ -160,7 +160,7 @@ export function Reader({ args }) {
                       }) : v.text}
                       {user.bm.has(k) && ' 🔖'}{user.notes.has(k) && ' ✎'}{user.tagged.has(k) && ' #'}
                       {blk.par[v.verse] && <span class="par">{blk.par[v.verse]}</span>}
-                      {s.showNoteMarkers && blk.notes.has(v.verse) && <span class="mk" onClick={(e) => { e.stopPropagation(); setSel([{ b: blk.b, c: blk.c, v: v.verse }]); setSheet('notes'); }}>Nota de estudio</span>}
+                      {s.showNoteMarkers && blk.notes.has(v.verse) && <span class="mk" onClick={(e) => { e.stopPropagation(); setSel([{ b: blk.b, c: blk.c, v: v.verse }]); setSheet('notes'); }}>nota MacArthur ›</span>}
                     </div>
                   </>
                 );
@@ -232,7 +232,7 @@ export function Picker({ current = 1, pickVerse = false, onClose, onPick }) {
     <Dialog title={title} onClose={onClose} actions={<button class="btn text" onClick={() => { if (ch && bk.chapters > 1) setCh(0); else if (bk) { setBk(null); setCh(0); } else onClose(); }}>{ch && bk?.chapters > 1 ? 'Capítulos' : bk ? 'Libros' : 'Cerrar'}</button>}>
       {!bk ? <>
         <div class="row"><button class={`chip ${t === 'AT' ? 'on' : ''}`} onClick={() => setT('AT')}>Antiguo T.</button><button class={`chip ${t === 'NT' ? 'on' : ''}`} onClick={() => setT('NT')}>Nuevo T.</button></div>
-        <div class="grid g3" style="margin-top:8px">{C.books.filter((x) => x.testament === t).map((x) => <button class={`cell ${x.id === current ? 'on' : ''}`} onClick={() => { setBk(x); if (x.chapters === 1) { if (pickVerse) setCh(1); else onPick(x.id, 1, 0); } }}>{x.name}</button>)}</div>
+        <div class="grid g3" style="margin-top:8px">{C.books.filter((x) => x.testament === t).map((x) => <button class={`cell ${x.id === current ? 'on' : ''}`} onClick={() => { setBk(x); if (x.chapters === 1) { if (pickVerse) setCh(1); else onPick(x.id, 1, 0); } }} style={x.name.length > 11 ? 'font-size:.78rem' : ''}>{x.name.length > 13 ? x.name.replace('Tesalonicenses', 'Tesal.') : x.name}</button>)}</div>
       </> : !ch ? (
         <div class="grid g6">{Array.from({ length: bk.chapters }, (_, i) => i + 1).map((n) => <button class="cell" onClick={() => (pickVerse ? setCh(n) : onPick(bk.id, n, 0))}>{n}</button>)}</div>
       ) : <>

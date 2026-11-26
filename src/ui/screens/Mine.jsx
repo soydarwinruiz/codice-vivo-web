@@ -16,7 +16,7 @@ export function Mine() {
   const d = useUser(async () => ({ topics: await U.topicsAll(), tags: await U.tagsAll(), hl: await U.highlightsAll(), notes: await U.notesAll(), bm: await U.bookmarksAll(), mem: (await U.memoryAll()).length }));
   return (
     <div>
-      <TopBar back={false} title="Mis temas"><button class="btn text" onClick={() => nav('/journal')}>🙏 Diario</button><button class="btn text" onClick={() => nav('/memory')}>🧠 Memorizar ({d?.mem ?? 0})</button></TopBar>
+      <TopBar back={false} title="Mis temas"><button class="btn text" onClick={() => nav('/memory')}>🧠 Memorizar ({d?.mem ?? 0})</button></TopBar>
       <Tabs tabs={TABS} value={tab} onChange={setTab} />
       {!d ? <Loading /> : <div class="list">
         {tab === 0 && <>
@@ -81,7 +81,14 @@ export function TopicDetail({ id }) {
       </TopBar>
       {d.t?.description && <p class="page small">{d.t.description}</p>}
       {!d.verses.length && <Empty icon="🗂️" title="Tema vacío" text="En el lector, selecciona versículos y toca «Tema»." />}
-      <div class="list">{d.verses.map((v) => <VerseItem r={{ book: v.book, chapter: v.chapter, verse: v.verse, verseEnd: v.verseEnd }} trailing={<button class="icon-btn" onClick={(e) => { e.stopPropagation(); U.removeTopicVerse(id, v.book, v.chapter, v.verse); }}>➖</button>} />)}</div>
+      {d.verses.length > 1 && <div class="row page" style="padding-top:4px;padding-bottom:0"><span class="small muted spacer">Usa ▲▼ para cambiar el orden</span><button class="btn text" onClick={() => U.sortTopicByBook(id)}>Ordenar por libro</button></div>}
+      <div class="list">{d.verses.map((v, i) => {
+        const move = (e, dir) => { e.stopPropagation(); const ids = d.verses.map((x) => x.id); const j = i + dir; if (j < 0 || j >= ids.length) return; [ids[i], ids[j]] = [ids[j], ids[i]]; U.reorderTopic(ids); };
+        return <VerseItem key={v.id} r={{ book: v.book, chapter: v.chapter, verse: v.verse, verseEnd: v.verseEnd }} trailing={<div class="row" style="gap:0;flex-wrap:nowrap">
+          <button class="icon-btn" aria-label="Subir" disabled={i === 0} onClick={(e) => move(e, -1)}>▲</button>
+          <button class="icon-btn" aria-label="Bajar" disabled={i === d.verses.length - 1} onClick={(e) => move(e, 1)}>▼</button>
+          <button class="icon-btn" aria-label="Quitar" onClick={(e) => { e.stopPropagation(); U.removeTopicVerse(id, v.book, v.chapter, v.verse); }}>➖</button></div>} />;
+      })}</div>
       {edit && d.t && <TopicEdit t={d.t} onClose={() => setEdit(false)} />}
       {confirm && <Dialog title="¿Eliminar el tema?" onClose={() => setConfirm(false)} actions={<><button class="btn text" onClick={() => setConfirm(false)}>Cancelar</button><button class="btn text" onClick={async () => { await U.deleteTopic(id); history.back(); }}>Eliminar</button></>}><p class="small">Los versículos no se borran de la Biblia, solo se quita la agrupación.</p></Dialog>}
     </div>

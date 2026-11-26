@@ -21,6 +21,7 @@ export function Setup({ onDone }) {
     <div class="setup">
       <img src="icon-192.png" width="72" height="72" style="border-radius:18px" alt="" />
       <h1 class="serif" style="margin-bottom:4px">Códice vivo</h1>
+      <p class="muted small" style="margin-top:0">por Danruz</p>
       <p class="muted" style="margin-top:0">Biblia de estudio 100% local</p>
       {ios && !standalone && (
         <div class="card tint">
