@@ -107,7 +107,8 @@ export const HIGHLIGHT_NAMES = ['Amarillo', 'Verde', 'Azul', 'Rosa', 'Naranja', 
 export const TOPIC_COLORS = [0xFF7A4A1E | 0, 0xFF2E7D32 | 0, 0xFF1565C0 | 0, 0xFFAD1457 | 0, 0xFFEF6C00 | 0, 0xFF6A1B9A | 0, 0xFF00838F | 0, 0xFF5D4037 | 0];
 
 export function share(text) {
-  if (navigator.share) navigator.share({ text }).catch(() => {});
+  // En el escritorio (Windows) «compartir» copia al portapapeles.
+  if (navigator.share && !window.codiceDesktop && matchMedia('(pointer: coarse)').matches) navigator.share({ text }).catch(() => {});
   else navigator.clipboard?.writeText(text).then(() => toast('Copiado'));
 }
 
@@ -116,7 +117,7 @@ export function VerseItem({ r, extra, color, onClick, trailing }) {
   const text = useAsync(() => C.passageText(getSettings().version, r), [r.book, r.chapter, r.verse, r.verseEnd]);
   return (
     <div class="item" onClick={onClick || (() => openRef(r))}>
-      {color != null && <span class="dot" style={{ width: 14, height: 14, background: argb(color) }} />}
+      {color != null && <span class="dot" style={{ width: '14px', height: '14px', background: argb(color) }} />}
       <div class="grow">
         <div class="over">{C.label(r)}</div>
         <div class="serif clamp4">{text ?? '…'}</div>

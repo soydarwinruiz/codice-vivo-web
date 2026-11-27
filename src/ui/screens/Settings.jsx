@@ -2,7 +2,7 @@ import { useState } from 'preact/hooks';
 import * as C from '../../data/content.js';
 import * as U from '../../data/user.js';
 import { useSettings, updateSettings } from '../../data/settings.js';
-import { call } from '../../db/client.js';
+import { call, desktop } from '../../db/client.js';
 import { TopBar, Dialog, toast, nav } from '../components.jsx';
 
 const THEMES = [['system', 'Sistema'], ['light', 'Claro'], ['dark', 'Oscuro'], ['sepia', 'Sepia']];
@@ -15,6 +15,7 @@ export function SettingsScreen() {
   async function exportBackup() {
     const json = await U.exportJson();
     const name = `codice-vivo-respaldo-${new Date().toISOString().slice(0, 10)}.json`;
+    if (desktop) { if (await desktop.saveText(name, json)) toast('Respaldo guardado'); return; }
     const file = new File([json], name, { type: 'application/json' });
     if (navigator.canShare?.({ files: [file] })) { await navigator.share({ files: [file], title: name }).catch(() => {}); return; }
     const a = document.createElement('a'); a.href = URL.createObjectURL(file); a.download = name; a.click();
@@ -30,6 +31,9 @@ export function SettingsScreen() {
         <div class="card serif" style={{ margin: 0, fontSize: `${s.fontSize}px`, lineHeight: s.lineHeight }}>En el principio era el Verbo, y el Verbo era con Dios, y el Verbo era Dios.</div>
         <label class="field"><span>Velocidad de lectura en voz alta: {s.speechRate.toFixed(1)}×</span><input type="range" min="0.6" max="1.4" step="0.1" value={s.speechRate} style="width:100%" onInput={(e) => updateSettings({ speechRate: +e.target.value })} /></label>
       </div>
+      {!desktop && <><div class="section-h">Diseño</div>
+        <div class="chips">{[['auto', 'Automático'], ['desktop', 'Escritorio (paneles)'], ['mobile', 'Teléfono']].map(([k, l]) => <button class={`chip ${s.layout === k ? 'on' : ''}`} onClick={() => updateSettings({ layout: k })}>{l}</button>)}</div>
+        <p class="page small muted" style="margin:0">Automático usa el diseño de escritorio en pantallas anchas con ratón.</p></>}
       <div class="section-h">Lectura</div>
       <div class="chips" style="flex-wrap:wrap">{C.versions.map((v) => <button class={`chip ${s.version === v.id ? 'on' : ''}`} onClick={() => updateSettings({ version: v.id })}>{v.id}</button>)}</div>
       <div class="list">

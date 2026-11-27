@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'preact/hooks';
-import { call } from '../db/client.js';
+import { call, desktop } from '../db/client.js';
 import { loadMeta, abbreviations } from '../data/content.js';
 import { initUser } from '../data/user.js';
-import { useSettings } from '../data/settings.js';
+import { useSettings, getSettings } from '../data/settings.js';
 import { initRefParser } from '../domain/refparser.js';
 import { useRoute, nav } from './router.js';
 import { PreviewHost, Toaster } from './components.jsx';
@@ -17,6 +17,7 @@ import { Mine, TopicDetail, TagDetail, Memory } from './screens/Mine.jsx';
 import { ProgressScreen, PlanScreen, Quiz } from './screens/Progress.jsx';
 import { SettingsScreen } from './screens/Settings.jsx';
 import { Journal, JournalEdit } from './screens/Journal.jsx';
+import { DesktopShell, wantsDesktop } from './desktop/Desktop.jsx';
 
 const TABS = [['/today', '☀️', 'Hoy'], ['/reader', '📖', 'Biblia'], ['/study', '🎓', 'Estudio'], ['/mine', '🔖', 'Mis temas'], ['/progress', '📊', 'Progreso']];
 
@@ -28,9 +29,9 @@ export function App() {
   async function boot() {
     try {
       const missing = [];
-      if (!navigator.storage?.getDirectory) missing.push('almacenamiento privado (OPFS)');
+      if (!desktop && !navigator.storage?.getDirectory) missing.push('almacenamiento privado (OPFS)');
       if (typeof DecompressionStream === 'undefined') missing.push('descompresión');
-      if (missing.length) throw new Error(`Este navegador no tiene: ${missing.join(', ')}. Actualiza el iPhone a iOS 16.4 o superior.`);
+      if (!desktop && missing.length) throw new Error(`Este navegador no tiene: ${missing.join(', ')}. Actualiza el iPhone a iOS 16.4 o superior.`);
       const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('La base de datos no respondió a tiempo.')), 20000));
       const st = await Promise.race([call('init'), timeout]);
       await initUser();
@@ -42,12 +43,17 @@ export function App() {
   }
   useEffect(() => { boot(); }, []);
 
+  const [wide, setWide] = useState(() => wantsDesktop(s));
+  useEffect(() => {
+    const m = matchMedia('(min-width: 1100px) and (pointer: fine)'); const f = () => setWide(wantsDesktop(getSettings()));
+    f(); m.addEventListener('change', f); return () => m.removeEventListener('change', f);
+  }, [s.layout]);
   const dark = s.theme === 'dark' || (s.theme === 'system' && matchMedia('(prefers-color-scheme: dark)').matches);
   useEffect(() => { document.documentElement.className = s.theme === 'sepia' ? 'theme-sepia' : dark ? 'theme-dark' : ''; }, [s.theme, dark]);
 
   if (state.phase === 'loading') return <div class="setup"><h1 class="serif">Códice vivo</h1><p class="muted">Abriendo…</p></div>;
-  if (state.phase === 'error') return <div class="setup"><h1 class="serif">Códice vivo</h1><p>No se pudo abrir el almacenamiento local: {state.error}</p><p class="muted small">Requiere iOS 16.4 o superior (Safari). Si usas el modo privado de Safari, ábrela en modo normal.</p><p class="muted small" style="word-break:break-all">{navigator.userAgent}</p><button class="btn" onClick={() => location.reload()}>Reintentar</button></div>;
-  if (state.phase === 'setup' || route.path === '/setup') return <Setup onDone={() => { nav('/today', null, true); boot(); }} />;
+  if (state.phase === 'error') return <div class="setup"><h1 class="serif">Códice vivo</h1><p>No se pudo abrir el almacenamiento local: {state.error}</p>{desktop ? <p class="muted small">Prueba a reiniciar la aplicación. Tus datos están en la carpeta de datos (menú Archivo › Abrir carpeta de datos).</p> : <p class="muted small">Requiere iOS 16.4 o superior (Safari). Si usas el modo privado de Safari, ábrela en modo normal.</p>}<p class="muted small" style="word-break:break-all">{navigator.userAgent}</p><button class="btn" onClick={() => location.reload()}>Reintentar</button></div>;
+  if (state.phase === 'setup' || route.path === '/setup') return <Setup onDone={() => { nav(wide ? '/reader' : '/today', null, true); boot(); }} />;
 
   const p = route.path, a = route.params;
   const tab = TABS.find((t) => p === t[0]);
@@ -82,6 +88,7 @@ export function App() {
     case '/journal-edit': screen = <JournalEdit id={+(a.id || 0)} kind={a.kind} b={+(a.b || 0)} c={+(a.c || 0)} v={+(a.v || 0)} />; break;
     default: screen = <Today />;
   }
+  if (wide) return <><DesktopShell route={route}>{p === '/reader' ? null : screen}</DesktopShell><PreviewHost /><Toaster /></>;
   return (
     <div class="app" key={p}>
       <div class={`content ${tab || p === '/reader' ? '' : 'nobar'}`}>{screen}</div>
