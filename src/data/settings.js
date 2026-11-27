@@ -6,6 +6,7 @@ const DEFAULTS = {
   version: 'RVR1960', parallelVersion: 'NBLA', parallel: false, continuous: false,
   fontSize: 19, lineHeight: 1.55, theme: 'system', showHeadings: true, showVerseNumbers: true, showNoteMarkers: true,
   lastBook: 43, lastChapter: 1, speechRate: 1,
+  layout: 'auto', // 'auto' | 'desktop' | 'mobile' (diseño de escritorio en pantallas anchas)
 };
 let current = { ...DEFAULTS, ...JSON.parse(localStorage.getItem(KEY) || '{}') };
 const subs = new Set();

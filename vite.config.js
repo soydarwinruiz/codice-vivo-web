@@ -2,7 +2,15 @@ import { defineConfig } from 'vite';
 import preact from '@preact/preset-vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-export default defineConfig({
+// «vite build --mode desktop» genera la interfaz de la versión de escritorio (Electron) en dist-desktop/,
+// sin service worker: los archivos se sirven desde el propio programa.
+export default defineConfig(({ mode }) => mode === 'desktop' ? {
+  base: '/',
+  build: { outDir: 'dist-desktop', emptyOutDir: true, target: 'chrome120' },
+  optimizeDeps: { exclude: ['@sqlite.org/sqlite-wasm'] },
+  worker: { format: 'es' },
+  plugins: [preact()],
+} : {
   base: '/codice-vivo-web/',
   build: { outDir: 'docs', emptyOutDir: true, target: 'es2020' },
   optimizeDeps: { exclude: ['@sqlite.org/sqlite-wasm'] },

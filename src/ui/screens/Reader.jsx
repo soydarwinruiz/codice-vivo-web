@@ -243,7 +243,7 @@ export function Picker({ current = 1, pickVerse = false, onClose, onPick }) {
   );
 }
 
-function StudyNotesSheet({ b, c, v, onClose }) {
+export function StudyNotesSheet({ b, c, v, onClose }) {
   const notes = useAsync(() => C.notesForVerse(b, c, v), [b, c, v]);
   const x = useAsync(() => C.crossRefs(b, c, v), [b, c, v]);
   return (
@@ -259,7 +259,7 @@ function StudyNotesSheet({ b, c, v, onClose }) {
   );
 }
 
-function NoteDialog({ b, c, v, existing, onClose }) {
+export function NoteDialog({ b, c, v, existing, onClose }) {
   const [text, setText] = useState(existing?.text || '');
   return (
     <Dialog title={`Nota · ${C.book(b).name} ${c}:${v}`} onClose={onClose} actions={<>
@@ -272,7 +272,7 @@ function NoteDialog({ b, c, v, existing, onClose }) {
   );
 }
 
-function TopicDialog({ b, c, verses, onClose }) {
+export function TopicDialog({ b, c, verses, onClose }) {
   const topics = useUser(() => U.topicsAll());
   const current = useAsync(() => U.topicsOfVerse(b, c, verses[0]), []);
   const [chosen, setChosen] = useState(null);
@@ -290,14 +290,14 @@ function TopicDialog({ b, c, verses, onClose }) {
       <div class="row"><input class="input" value={name} onInput={(e) => setName(e.target.value)} placeholder="Nuevo tema (p. ej. Fe)" />
         <button class="btn tonal" onClick={async () => { if (!name.trim()) return; const id = await U.createTopic(name, '', TOPIC_COLORS[(topics?.length || 0) % TOPIC_COLORS.length]); const n = new Set(ch); n.add(id); setChosen(n); setName(''); }}>＋</button></div>
       <div class="list" style="margin-top:8px">{(topics || []).map((t) => (
-        <div class="item" onClick={() => flip(t.id)}><input type="checkbox" checked={ch.has(t.id)} /><span class="dot" style={{ width: 12, height: 12, background: argb(t.color) }} /><div class="grow">{t.name}</div><span class="muted">{t.count}</span></div>
+        <div class="item" onClick={() => flip(t.id)}><input type="checkbox" checked={ch.has(t.id)} /><span class="dot" style={{ width: '12px', height: '12px', background: argb(t.color) }} /><div class="grow">{t.name}</div><span class="muted">{t.count}</span></div>
       ))}</div>
       {topics?.length === 0 && <p class="small muted">Crea tu primer tema para agrupar versículos.</p>}
     </Dialog>
   );
 }
 
-function TagDialog({ b, c, verses, onClose }) {
+export function TagDialog({ b, c, verses, onClose }) {
   const tags = useUser(() => U.tagsAll());
   const current = useAsync(() => U.tagsOfVerse(b, c, verses[0]), []);
   const [chosen, setChosen] = useState(null); const [name, setName] = useState('');
@@ -318,7 +318,7 @@ function TagDialog({ b, c, verses, onClose }) {
   );
 }
 
-function WordsDialog({ version, v, existing, onClose }) {
+export function WordsDialog({ version, v, existing, onClose }) {
   const words = useMemo(() => splitWords(v.text), [v]);
   const [colors, setColors] = useState(() => { const m = {}; existing.forEach((e) => { for (let i = e.wordStart; i <= e.wordEnd; i++) m[i] = e.color; }); return m; });
   const [picked, setPicked] = useState([]);
