@@ -1,6 +1,6 @@
 {
   "name": "codice-vivo",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Códice vivo — Biblia de estudio 100% local (web para iPhone y escritorio para Windows)",
   "main": "electron/main.cjs",
   "scripts": {
