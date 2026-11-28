@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import * as C from '../../data/content.js';
 import * as U from '../../data/user.js';
 import { useSettings } from '../../data/settings.js';
@@ -96,9 +96,29 @@ export function LessonScreen({ id: id0 }) {
   const total = useAsync(() => C.lessonCount(), []);
   const todayId = useAsync(async () => (await C.lessonOfDay(U.today())).id, []);
   const refl = useUser(() => U.reflection(id), [id]);
+  const done = useUser(async () => (await U.devotionalDone(U.today())).has('lesson'), []);
   const [draft, setDraft] = useState(null);
-  const text = draft ?? refl?.text ?? '';
+  const [saving, setSaving] = useState(false);
+  const saved = refl?.text || '';
+  const text = draft ?? saved;
+  const dirty = draft !== null && draft.trim() !== saved;
   const r = l?.ref ? parseQuery(l.ref) : null;
+
+  // Guardar: también al salir del cuadro, al cambiar de lección y al cerrar la pantalla, para no perder lo escrito.
+  async function save(quiet = false) {
+    if (!dirty || saving) return;
+    setSaving(true);
+    try { await U.saveReflection(id, draft); if (!quiet) toast(draft.trim() ? 'Reflexión guardada' : 'Reflexión borrada'); }
+    catch (e) { toast('No se pudo guardar la reflexión'); console.error(e); }
+    finally { setSaving(false); }
+  }
+  const pending = useRef(null);
+  pending.current = dirty ? { id, text: draft } : null;
+  useEffect(() => () => { const p = pending.current; if (p) U.saveReflection(p.id, p.text).catch(console.error); }, []);
+  async function go(n) { await save(true); setDraft(null); setId(n); scrollTo(0, 0); document.querySelector('.dk-module')?.scrollTo(0, 0); }
+  async function complete() { await save(true); await U.markDevotional('lesson'); toast('¡Lección completada! +5 puntos'); }
+  const when = refl?.updated ? new Date(refl.updated).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+
   return (
     <div>
       <TopBar title={`Lección ${id} de ${total || '…'}`}>
@@ -110,19 +130,34 @@ export function LessonScreen({ id: id0 }) {
           <h2 class="serif">{l.title}</h2>
           {r && <button class="btn text" onClick={() => openRef(r)}>Pasaje clave: {l.ref}</button>}
           <Article text={l.content} book={l.book} />
+          {l.book > 0 && <button class="btn text" style="padding-left:0" onClick={() => nav('/intro', { b: l.book })}>Ver introducción completa del libro ›</button>}
+
           <div class="card sec" style="margin:16px 0">
             <h3>Para reflexionar</h3>
             {l.questions.map((q, i) => <p class="small">{i + 1}. {q}</p>)}
-            <textarea class="input" value={text} onInput={(e) => setDraft(e.target.value)} placeholder="Escribe tus respuestas y lo que Dios te enseña…" />
-            <div class="row"><span class="spacer" /><button class="btn text" disabled={text === (refl?.text || '')} onClick={async () => { await U.saveReflection(id, text); setDraft(null); toast('Reflexión guardada'); }}>Guardar reflexión</button></div>
-            {l.book > 0 && <button class="btn text" onClick={() => nav('/intro', { b: l.book })}>Ver introducción completa del libro</button>}
+            <textarea class="input" value={text} onInput={(e) => setDraft(e.target.value)} onBlur={() => save()} placeholder="Escribe tus respuestas y lo que Dios te enseña…" />
+            <div class="row" style="margin-top:8px">
+              <span class="small spacer" style={{ color: dirty ? 'var(--danger)' : 'var(--ok)' }}>
+                {saving ? 'Guardando…' : dirty ? 'Cambios sin guardar' : saved ? `✓ Guardada${when ? ` · ${when}` : ''}` : ''}
+              </span>
+              <button class="btn" disabled={!dirty || saving} onClick={() => save()}>Guardar reflexión</button>
+            </div>
           </div>
+
+          {id === todayId && (
+            <div class={`card ${done ? 'tert' : 'tint'}`} style="margin:16px 0">
+              {done ? <h3>✓ Completaste la lección de hoy</h3> : <>
+                <h3>¿Terminaste la lección de hoy?</h3>
+                <p class="small" style="margin:4px 0 10px">Márcala como completada para sumar puntos y mantener tu racha. Tu reflexión se guarda a la vez.</p>
+                <button class="btn" onClick={complete}>Completar lección</button>
+              </>}
+            </div>
+          )}
+
           <div class="row">
-            <button class="btn outline" disabled={id <= 1} onClick={() => { setId(id - 1); setDraft(null); scrollTo(0, 0); }}>‹ Anterior</button>
+            <button class="btn outline" disabled={id <= 1} onClick={() => go(id - 1)}>‹ Anterior</button>
             <span class="spacer" />
-            {id === todayId && <button class="btn" onClick={() => U.markDevotional('lesson')}>Completar</button>}
-            <span class="spacer" />
-            <button class="btn outline" disabled={id >= total} onClick={() => { setId(id + 1); setDraft(null); scrollTo(0, 0); }}>Siguiente ›</button>
+            <button class="btn outline" disabled={id >= total} onClick={() => go(id + 1)}>Siguiente ›</button>
           </div>
         </div>
       )}
